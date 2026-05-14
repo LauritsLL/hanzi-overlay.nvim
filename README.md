@@ -2,7 +2,7 @@
 
 A Neovim plugin that overlays Mandarin hanzi as inline virtual text on top of
 English/Danish words while you write. Companion to
-[hanzi-gate.nvim](../hanzi-gate.nvim) — they share a vocabulary directory at
+[hanzi-gate.nvim](https://github.com/LauritsLL/hanzi-gate.nvim) — they share a vocabulary directory at
 `~/.config/nvim/hanzi-immersion/`.
 
 ```
