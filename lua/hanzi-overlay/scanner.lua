@@ -39,12 +39,22 @@ local function boundary_ok(line, s, e, allow_trailing)
   if not allow_trailing or allow_trailing == "" then return false, e end
 
   local rest = line:sub(e)
-  local prefix = rest:match("^" .. allow_trailing)
-  if not prefix or prefix == "" then return false, e end
-  local j = e + #prefix
-  local after2 = j <= #line and line:byte(j) or nil
-  if is_word_byte(after2) then return false, e end
-  return true, j
+  local patterns
+  if type(allow_trailing) == "table" then
+    patterns = allow_trailing
+  else
+    patterns = { allow_trailing }
+  end
+
+  for _, p in ipairs(patterns) do
+    local prefix = rest:match("^" .. p)
+    if prefix and prefix ~= "" then
+      local j = e + #prefix
+      local after2 = j <= #line and line:byte(j) or nil
+      if not is_word_byte(after2) then return true, j end
+    end
+  end
+  return false, e
 end
 
 -- Lowercase the entire line once -- vim.fn.tolower is codepoint-aware and

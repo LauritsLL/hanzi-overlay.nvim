@@ -42,16 +42,30 @@ M.defaults = {
   -- end of the match is still part of a word (e.g. matched "energi" with "en"
   -- following), the matcher normally rejects -- which kills basically every
   -- inflected Danish noun: energien, lyset, rummet, kraften, banerne, etc.
-  -- A pattern here is consumed greedily after the match, then the boundary is
-  -- re-checked. Defaults:
-  --   danish  -> "%a?[etrns]+"  optional stem-doubling letter (rum->rummet)
-  --                             then one or more of: e t r n s, the bytes that
-  --                             make up Danish noun endings.
+  -- A pattern (or list of patterns) here is tried against the bytes following
+  -- the match; the first one that consumes a prefix landing on a clean word
+  -- boundary wins, and the extmark anchors at the extended position.
+  --
+  -- The Danish default is an explicit allowlist of real inflectional suffixes
+  -- rather than a permissive character class. An earlier "%a?[etrns]+" let
+  -- "te" (tea) annotate the word "test" because "st" is a run of allowed
+  -- bytes -- but "st" is not a Danish ending. List entries are ordered
+  -- longest-first so the matcher consumes the maximal valid suffix. The
+  -- optional leading "%a?" handles consonant-doubling stems (rum -> rummet).
   --   english -> nil (strict)   "wave" must not match inside "waver".
-  -- Set a key to false (or empty string) to disable for that source, or add
-  -- your own pattern. Patterns are Lua patterns, applied to lowercased text.
+  -- Set a key to false (or nil) to disable for that source, or supply your
+  -- own pattern / list of patterns. Patterns are Lua patterns, applied to
+  -- lowercased text.
   allow_trailing = {
-    danish  = "%a?[etrns]+",
+    danish = {
+      "%a?ernes", "%a?enes",
+      "%a?erne", "%a?ende", "%a?ene", "%a?ede",
+      "%a?ens", "%a?ets", "%a?ers", "%a?ere", "%a?est",
+      "%a?en", "%a?et", "%a?er", "%a?es",
+      "%a?e",
+      "rne", "ne", "te", "ts", "de",
+      "r", "s", "t",
+    },
     english = nil,
   },
 
