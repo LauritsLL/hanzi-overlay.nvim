@@ -14,13 +14,40 @@ local ts = require("hanzi-overlay.treesitter")
 local hl = require("hanzi-overlay.highlight")
 local exposures = require("hanzi-overlay.exposures")
 
--- Look up the gate's known-words map; returns nil if hanzi-gate isn't loaded,
--- so the caller can fall back to "treat everything as known" (no visual change).
+-- Read the gate's per-word SRS data (state.json) regardless of the
+-- gate_integration flag. The map is only consulted for highlight bucketing --
+-- it is not a "promotion" or "write" bridge, just a read of whatever the gate
+-- has been recording on its own. If hanzi-gate isn't installed the call
+-- returns nil and every overlay falls back to the default group, identical to
+-- pre-integration behaviour.
 local function gate_known_words()
   local ok, store = pcall(require, "hanzi-gate.store")
   if not ok then return nil end
   local st = store.load and store.load()
   return st and st.words or nil
+end
+
+-- Pick the highlight group for one hanzi from its gate `correct` count.
+-- Thresholds come from config.srs_thresholds; defaults grade at 5 and 15
+-- correct uses (see config.lua for the rationale). We use raw `correct`
+-- rather than the SRS ease score because the gate caps ease at 3.0 after
+-- 5 passes -- past that, ease can't distinguish a word you've used 6 times
+-- from one you've used 60.
+--
+-- Hanzi with no state record at all are treated as fresh: in practice that
+-- only happens for legacy glosses.tsv rows added before this workflow, and
+-- surfacing them brightly nudges the user to re-gate them.
+local function pick_group(gate_known, hanzi)
+  if not gate_known or not hanzi then return hl.group end
+  local rec = gate_known[hanzi]
+  if type(rec) ~= "table" then return hl.fresh end
+  local correct = tonumber(rec.correct) or 0
+  local thr = config.get().srs_thresholds or {}
+  local mastered  = tonumber(thr.mastered)  or 15
+  local improving = tonumber(thr.improving) or 5
+  if correct >= mastered  then return hl.mastered  end
+  if correct >= improving then return hl.improving end
+  return hl.fresh
 end
 
 M.ns = vim.api.nvim_create_namespace("hanzi_overlay")
@@ -117,12 +144,12 @@ function M.render(buf)
   local max = cfg.max_overlays
   local used_keys = {}
 
-  -- Bridge once per render: snapshot the gate's known-words map (if any) and
-  -- decide whether to use the "new" highlight per hanzi. When the bridge is off
-  -- or hanzi-gate isn't loaded, `gate_known` stays nil and every hit uses the
-  -- default group -- identical to pre-integration behaviour.
+  -- Snapshot the gate's per-word stats once per render. Used for SRS-ease
+  -- bucketing of highlight groups (fresh/improving/mastered). Independent of
+  -- gate_integration.enabled, which now only controls the write side
+  -- (exposures.record) and the legacy binary new/known distinction.
   local gi = cfg.gate_integration or {}
-  local gate_known = gi.enabled and gate_known_words() or nil
+  local gate_known = gate_known_words()
 
   -- "buffer" density: one seen set for the whole render.
   -- "paragraph" density: reset whenever we cross a blank line.
@@ -171,12 +198,7 @@ function M.render(buf)
           local text = (mode == "pinyin") and hit.entry.pinyin or hit.entry.hanzi
           if text and text ~= "" then
             local h = hit.entry.hanzi
-            local group = hl.group
-            if gate_known then
-              local st = h and gate_known[h]
-              local seen = type(st) == "table" and (tonumber(st.seen) or 0) or 0
-              if seen == 0 then group = hl.new_group end
-            end
+            local group = pick_group(gate_known, h)
             pcall(vim.api.nvim_buf_set_extmark, buf, M.ns, row, hit.col_end, {
               virt_text = { { " " .. text, group } },
               virt_text_pos = "inline",

@@ -44,12 +44,17 @@ same directory used by `hanzi-gate.nvim`:
 
 ```
 ~/.config/nvim/hanzi-immersion/
-├── words.txt        # one hanzi per line (used by hanzi-gate)
+├── words.txt        # hanzi | pinyin | english | danish  (used by hanzi-gate)
 └── glosses.tsv      # hanzi <TAB> pinyin <TAB> english <TAB> danish
 ```
 
 Only `glosses.tsv` is needed by hanzi-overlay. If it's missing on setup,
 the plugin prints a warning and stays inert (no errors).
+
+If you also use `hanzi-gate.nvim`, you don't need to maintain `glosses.tsv`
+by hand: the gate auto-appends rows for words you successfully pass with, so
+the overlay only starts annotating a word once you've demonstrated active
+mastery. See the hanzi-gate README under "Integration with hanzi-overlay".
 
 ## glosses.tsv format
 
@@ -72,6 +77,11 @@ Lines starting with `#` are comments; blank lines are skipped.
 - Phrases (multi-word glosses like `magnetic field`) match as a single unit.
 - Matching is case-insensitive (Danish letters æ/ø/å included).
 - Longest gloss wins on overlap (`magnetic field` beats `field`).
+- Infinitive aliasing: Danish glosses starting with `at <verb>` ("at synes")
+  and English glosses starting with `to <verb>` ("to feel") also match the
+  bare verb in your prose — so "Jeg synes" annotates without you having to
+  also list "synes" separately in your TSV. The literal `at synes` still
+  wins where it appears, thanks to longest-first matching.
 
 ## Configuration
 
@@ -81,9 +91,14 @@ Lines starting with `#` are comments; blank lines are skipped.
 | `density`           | `"paragraph"`                        | `"every"` / `"paragraph"` (first per gloss per paragraph) / `"buffer"` (once)    |
 | `shared_data_dir`   | `"~/.config/nvim/hanzi-immersion"`   | Directory containing `glosses.tsv`                                               |
 | `default_mode`      | `"hanzi"`                            | `"hanzi"` / `"pinyin"` / `"off"`                                                 |
-| `highlight.fg`      | `"#888888"`                          | Overlay foreground (when `termguicolors` is on)                                  |
+| `highlight.fg`      | `"#e0af68"`                          | Fallback overlay fg, used when hanzi-gate isn't installed (no SRS data)          |
 | `highlight.italic`  | `false`                              | Italicise the overlay text                                                       |
 | `highlight.bold`    | `false`                              | Bold the overlay text                                                            |
+| `highlight.srs.fresh`     | `"#fb923c"`                    | SRS "fresh" colour — `correct < srs_thresholds.improving` (see below)            |
+| `highlight.srs.improving` | `"#e0af68"`                    | SRS "improving" colour — `improving ≤ correct < mastered`                        |
+| `highlight.srs.mastered`  | `"#a8896b"`                    | SRS "mastered" colour — `correct ≥ srs_thresholds.mastered`                      |
+| `srs_thresholds.improving` | `5`                            | `correct` count (in hanzi-gate's `state.json`) at which a word leaves "fresh"    |
+| `srs_thresholds.mastered`  | `15`                           | `correct` count at which a word reaches "mastered"                               |
 | `case_insensitive`  | `true`                               | Lower-case both sides before matching                                            |
 | `max_overlays`      | `500`                                | Per-buffer hard cap                                                              |
 | `debounce_ms`       | `300`                                | Refresh delay after the last edit                                                |
@@ -91,6 +106,27 @@ Lines starting with `#` are comments; blank lines are skipped.
 | `keymaps.toggle_mode`| `"<leader>zh"`                      | Cycle hanzi → pinyin → off                                                       |
 | `keymaps.force_refresh`| `"<leader>zH"`                    | Force refresh current buffer                                                     |
 | `keymaps.disable`   | `"<leader>z<leader>"`                | Disable for this buffer (session only)                                           |
+
+## SRS-graded colouring
+
+When `hanzi-gate.nvim` is installed, the overlay reads its `state.json` and
+colour-grades each annotation by how often you've successfully used the word
+in the gate:
+
+| Bucket | Group | Default colour | Condition |
+| --- | --- | --- | --- |
+| Fresh | `HanziOverlaySrs1` | `#fb923c` vivid orange | `correct < srs_thresholds.improving` (default `5`) |
+| Improving | `HanziOverlaySrs2` | `#e0af68` warm amber | between the two thresholds |
+| Mastered | `HanziOverlaySrs3` | `#a8896b` muted amber | `correct ≥ srs_thresholds.mastered` (default `15`) |
+
+Bright shades pull the eye to words you still need to learn; muted shades
+fade words you've earned. Override the colours or thresholds via
+`highlight.srs.*` and `srs_thresholds.*` in `setup()`.
+
+If hanzi-gate isn't loadable (or you don't use it), every annotation falls
+back to `highlight.fg` — a single colour, no gradient. The read is automatic
+and doesn't require flipping `gate_integration.enabled`; that flag now only
+controls the write-side bridge (overlay → `exposures.json`).
 
 ## Commands
 

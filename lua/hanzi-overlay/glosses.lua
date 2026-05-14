@@ -160,8 +160,22 @@ local function build_index(rows)
         by_length[#by_length + 1] = key
       end
     end
-    for _, en in ipairs(split_glosses(r.english)) do add(en, "english") end
-    for _, da in ipairs(split_glosses(r.danish))  do add(da, "danish")  end
+    -- Infinitives are cited in dictionary form -- Danish "at synes", English
+    -- "to feel" -- but appear in real prose as the bare verb ("Jeg synes",
+    -- "I feel"). Index both forms: the longer literal phrase still wins where
+    -- it appears in text (keys are sorted longest-first below), and the
+    -- bare-verb alias gives us a hit when the user just writes the verb.
+    local function add_with_infinitive_alias(phrase, source, marker)
+      add(phrase, source)
+      local rest = phrase:match("^" .. marker .. "%s+(.+)$")
+      if rest and rest ~= "" then add(rest, source) end
+    end
+    for _, en in ipairs(split_glosses(r.english)) do
+      add_with_infinitive_alias(en, "english", "[Tt]o")
+    end
+    for _, da in ipairs(split_glosses(r.danish))  do
+      add_with_infinitive_alias(da, "danish",  "[Aa]t")
+    end
   end
   -- Sort longest-first so multi-word phrases beat substrings of themselves
   -- ("magnetic field" wins over "field" at the same starting position).

@@ -25,7 +25,11 @@ M.defaults = {
   default_mode = "hanzi",
 
   highlight = {
-    fg = "#888888",
+    -- Warm amber. Once auto-mirror from hanzi-gate is on, almost every hanzi
+    -- in glosses.tsv has been "mastered", so the old dim-grey default left
+    -- every annotation invisible. Same shade as HanziOverlayNew so the two
+    -- groups feel like one palette when gate_integration is also on.
+    fg = "#e0af68",
     italic = false,
     bold = false,
   },
@@ -85,6 +89,20 @@ M.defaults = {
     "includegraphics", "graphicspath",
     "bibliography", "bibliographystyle", "addbibresource",
     "hypersetup",
+  },
+
+  -- SRS bucket thresholds, in "correct uses in hanzi-gate". A word's overlay
+  -- highlight depends on which bucket its `correct` count falls into:
+  --   correct <  improving       -> "fresh"      (HanziOverlaySrs1)
+  --   improving <= correct < mastered -> "improving" (HanziOverlaySrs2)
+  --   correct >= mastered        -> "mastered"   (HanziOverlaySrs3)
+  -- Defaults are deliberately strict: "mastered" means roughly 2-4 weeks of
+  -- daily gating at ~3 passes per session. Tune lower for faster fade, higher
+  -- to keep words orange longer. We use `correct` rather than ease because the
+  -- gate caps ease at 3.0 after 5 passes -- ease can't grade beyond that.
+  srs_thresholds = {
+    improving = 5,
+    mastered  = 15,
   },
 
   -- Optional bridge to hanzi-gate.nvim. When `enabled = true` the overlay:
